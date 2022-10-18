@@ -56,7 +56,7 @@
     "oscarotero/env": "^2.1",
     "roots/bedrock-autoloader": "^1.0",
     "roots/bedrock-disallow-indexing": "^2.0",
-    "roots/wordpress": "6.0.2",
+    "roots/wordpress": "6.0.3",
     "wpackagist-plugin/wp-gatsby": "^2.0",
     "pantheon-systems/pantheon-decoupled": "^1.0",
     "roots/wp-config": "1.0.0",
