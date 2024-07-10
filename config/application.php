@@ -10,6 +10,9 @@
 use Roots\WPConfig\Config;
 use function Env\env;
 
+// USE_ENV_ARRAY + CONVERT_* + STRIP_QUOTES.
+Env\Env::$options = 31;
+
 /**
  * Directory containing all of the site's files
  *
@@ -32,7 +35,7 @@ $env_files = file_exists( $root_dir . '/.env.local' )
 	? [ '.env', '.env.pantheon', '.env.local' ]
 	: [ '.env', '.env.pantheon' ];
 
-$dotenv = Dotenv\Dotenv::createUnsafeImmutable( $root_dir, $env_files, false );
+$dotenv = Dotenv\Dotenv::createImmutable( $root_dir, $env_files, false );
 if (
 	// Check if a .env file exists.
 	file_exists( $root_dir . '/.env' ) ||
@@ -88,7 +91,6 @@ if ( isset( $_ENV['PANTHEON_ENVIRONMENT'] ) && ! isset( $_ENV['LANDO'] ) ) {
 	Config::define( 'WP_HOME', env( 'WP_HOME' ) );
 	Config::define( 'WP_SITEURL', env( 'WP_SITEURL' ) );
 	Config::define( 'DB_HOST', env( 'DB_HOST' ) ?: 'localhost' );
-	Config::define( 'DISABLE_WP_CRON', env( 'DISABLE_WP_CRON' ) ?: false );
 }
 
 /**
