@@ -169,7 +169,7 @@ function __is_login_url( string $url ) : bool {
 		return true;
 	}
 
-	return false
+	return false;
 }
 
 /**
