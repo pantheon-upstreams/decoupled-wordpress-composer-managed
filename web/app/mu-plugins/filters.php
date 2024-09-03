@@ -3,7 +3,7 @@
  * Plugin Name: Pantheon WordPress Filters
  * Plugin URI:   https://github.com/pantheon-systems/wordpress-composer-managed
  * Description:  Filters for Composer-managed WordPress sites on Pantheon.
- * Version:      1.2.1
+ * Version:      1.2.2
  * Author:       Pantheon Systems
  * Author URI:   https://pantheon.io/
  * License:      MIT License
@@ -70,7 +70,7 @@ function fix_core_resource_urls( string $url ) : string {
 	}
 
 	$path = $parsed_url['path'];
-	$core_paths = [ 'wp-includes/', 'wp-admin/', 'wp-content/' ];
+	$core_paths = [ '/wp-includes/', '/wp-content/' ];
 	$path_modified = false;
 
 	foreach ( $core_paths as $core_path ) {
@@ -133,7 +133,14 @@ function prepopulate_graphql_endpoint_url() {
 	if ( $options ) {
 		return;
 	}
+
+	$options = [];
+	$site_path = site_url();
+	$endpoint = ( ! empty( $site_path ) || strpos( $site_path, 'wp' ) !== false ) ? 'graphql' : 'wp/graphql';
+	$options['graphql_endpoint'] = $endpoint;
+	update_option( 'graphql_general_settings', $options );
 }
+add_action( 'graphql_init', __NAMESPACE__ . '\\prepopulate_graphql_endpoint_url' );
 
 /**
  * Drop the /wp, if it exists, from URLs on the main site (single site or multisite).
@@ -155,7 +162,7 @@ function adjust_main_site_urls( string $url ) : string {
 	}
 
 	// If this is the main site, drop the /wp.
-	if ( is_main_site() ) {
+	if ( is_main_site() && is_multisite() ) {
 		$url = str_replace( '/wp/', '/', $url );
 	}
 
@@ -163,26 +170,6 @@ function adjust_main_site_urls( string $url ) : string {
 }
 add_filter( 'home_url', __NAMESPACE__ . '\\adjust_main_site_urls', 9 );
 add_filter( 'site_url', __NAMESPACE__ . '\\adjust_main_site_urls', 9 );
-
-/**
- * Add /wp prefix to all admin and login URLs.
- * Since /wp is where the core files are installed, this normalizes all non-front-facing urls to use the correct url structure.
- *
- * @since 1.1.0
- * @param string $url The URL to check.
- * @return string The corrected admin or login URL (or the base url if not an admin or login url).
- */
-function add_wp_prefix_to_login_and_admin_urls( string $url ) : string {
-	if (  ! __is_login_url( $url ) ) {
-		return $url;
-	}
-	if ( strpos( $url, '/wp/' ) !== false ) {
-		return $url;
-	}
-	return __normalize_wp_url( preg_replace( '/(\/wp-(login|admin))/', '/wp/$1', $url ) );
-}
-add_filter( 'login_url', __NAMESPACE__ . '\\add_wp_prefix_to_login_and_admin_urls', 9 );
-add_filter( 'admin_url', __NAMESPACE__ . '\\add_wp_prefix_to_login_and_admin_urls', 9 );
 
 /**
  * Check the URL to see if it's either an admin or wp-login URL.
@@ -205,11 +192,11 @@ function __is_login_url( string $url ) : bool {
 	}
 
 	// Check if the URL is a login or admin page
-	if (strpos($url, 'wp-login') !== false || strpos($url, 'wp-admin') !== false) {
+	if ( strpos( $url, 'wp-login' ) !== false || strpos($url, 'wp-admin' ) !== false) {
 		return true;
 	}
 
-	return false
+	return false;
 }
 
 /**
@@ -220,15 +207,31 @@ function __is_login_url( string $url ) : bool {
  * @return string The normalized URL.
  */
 function __normalize_wp_url( string $url ): string {
-    $scheme = parse_url( $url, PHP_URL_SCHEME );
-    $scheme_with_separator = $scheme ? $scheme . '://' : '';
+	// Parse the URL into components.
+	$parts = parse_url( $url );
 
-    // Remove the scheme from the URL if it exists.
-    $remaining_url = $scheme ? substr( $url, strlen($scheme_with_separator ) ) : $url;
+	// Normalize the URL to remove any double slashes.
+	if ( isset( $parts['path'] ) ) {
+		$parts['path'] = preg_replace( '#/+#', '/', $parts['path'] );
+	}
 
-    // Normalize the remaining URL to remove any double slashes.
-    $normalized_url = str_replace( '//', '/', $remaining_url );
+	// Rebuild and return the full normalized URL.
+	return __rebuild_url_from_parts( $parts );
+}
 
-    // Reconstruct and return the full normalized URL.
-    return $scheme_with_separator . $normalized_url;
+/**
+ * Rebuild parsed URL from parts.
+ *
+ * @since 1.1.0
+ * @param array $parts URL parts from parse_url.
+ * @return string Re-parsed URL.
+ */
+function __rebuild_url_from_parts( array $parts ) : string {
+	return trailingslashit(
+		( isset( $parts['scheme'] ) ? "{$parts['scheme']}:" : '' ) .
+		( isset( $parts['host'] ) ? "{$parts['host']}" : '' ) .
+		( isset( $parts['path'] ) ? untrailingslashit( "{$parts['path']}" ) : '' ) .
+		( isset( $parts['query'] ) ? str_replace( '/', '', "?{$parts['query']}" ) : '' ) .
+		( isset( $parts['fragment'] ) ? str_replace( '/', '', "#{$parts['fragment']}" ) : '' )
+	);
 }
